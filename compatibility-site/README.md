@@ -5,13 +5,17 @@ and compressed logs live in `JICA98/Bachata-S4-Compatibility`.
 
 The Pages workflow checks out both repositories, validates the append-only report source,
 generates a compact homepage index and one full JSON file per CUSA, copies only optimized
-screenshots into the Pages artifact, and leaves logs in the data repository.
+screenshots into the Pages artifact, and leaves logs in the data repository. The current
+Bachata S4 logo (`android/BachataS4/app/src/main/play_store_512.png`) is copied into the
+artifact as `assets/bachata-s4-logo.png`, so the frontend always ships the same mark used
+by the Android app, Play Store listing, and README.
 
 For local preview from sibling clones:
 
 ```bash
 rm -rf /tmp/bachata-compat-preview
 cp -a compatibility-site /tmp/bachata-compat-preview
+cp android/BachataS4/app/src/main/play_store_512.png /tmp/bachata-compat-preview/assets/bachata-s4-logo.png
 python3 ../Bachata-S4-Compatibility/scripts/build_site_data.py \
   --root ../Bachata-S4-Compatibility \
   --output /tmp/bachata-generated

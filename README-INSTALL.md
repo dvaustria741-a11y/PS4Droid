@@ -42,7 +42,7 @@ Open `http://localhost:8080`. Commit and push the files, then set **Settings →
 Source** to **GitHub Actions**. The expected URL is:
 
 ```text
-https://jica98.github.io/Bachata-S4/
+https://bachatas4.games/
 ```
 
 ## Sync releases

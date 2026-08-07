@@ -68,7 +68,8 @@ jobs:
           set -euo pipefail
           rm -rf _site
           cp -a bachata/compatibility-site _site
-          mkdir -p _site/data _site/evidence
+          mkdir -p _site/data _site/evidence _site/assets
+          cp bachata/android/BachataS4/app/src/main/play_store_512.png _site/assets/bachata-s4-logo.png
           cp compatibility/generated/site-index.json _site/data/site-index.json
           cp compatibility/generated/releases.json _site/data/releases.json
           cp -a compatibility/generated/games _site/data/games

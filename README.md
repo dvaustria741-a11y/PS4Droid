@@ -29,7 +29,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 </p>
 
 <p align="center">
-  <a href="https://jica98.github.io/Bachata-S4/">
+  <a href="https://bachatas4.games/">
     <img alt="Live compatibility database" src="https://img.shields.io/badge/Compatibility-Live_database-6f42c1?style=flat-square">
   </a>
   <img alt="Android 12 or newer" src="https://img.shields.io/badge/Android-12%2B-3DDC84?style=flat-square&logo=android&logoColor=white">
@@ -40,7 +40,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 </p>
 
 <p align="center">
-  <a href="https://jica98.github.io/Bachata-S4/">Compatibility</a>
+  <a href="https://bachatas4.games/">Compatibility</a>
   ·
   <a href="https://github.com/JICA98/Bachata-S4/issues">Game discussions and issues</a>
   ·
@@ -85,7 +85,7 @@ Compatibility is evidence-based and specific to the exact emulator release, devi
 Android version, guest backend, and graphics driver used by the tester.
 
 The live source of truth is the
-**[Bachata S4 compatibility website](https://jica98.github.io/Bachata-S4/)**.
+**[Bachata S4 compatibility website](https://bachatas4.games/)**.
 Structured report data, screenshots, and compressed logs are maintained separately in
 **[`JICA98/Bachata-S4-Compatibility`](https://github.com/JICA98/Bachata-S4-Compatibility)**.
 
@@ -93,20 +93,20 @@ Structured report data, screenshots, and compressed logs are maintained separate
 
 <!-- compatibility-running-games-start -->
 | Game | Serial | Current best status | Live report | Discussion |
-|---|---|---:|---|---|
-| Bloodborne | `CUSA00900` | **In-game** | [View reports](https://jica98.github.io/Bachata-S4/?game=CUSA00900) | [Issue #2](https://github.com/JICA98/Bachata-S4/issues/2) |
-| Dark Souls: Remastered | `CUSA08692` | **In-game** | [View reports](https://jica98.github.io/Bachata-S4/?game=CUSA08692) | [Issue #3](https://github.com/JICA98/Bachata-S4/issues/3) |
-| Sonic Mania | `CUSA07023` | **In-game** | [View reports](https://jica98.github.io/Bachata-S4/?game=CUSA07023) | [Issue #4](https://github.com/JICA98/Bachata-S4/issues/4) |
-| Sekiro: Shadows Die Twice | `CUSA13801` | **In-game** | [View reports](https://jica98.github.io/Bachata-S4/?game=CUSA13801) | [Issue #5](https://github.com/JICA98/Bachata-S4/issues/5) |
+|---|---:|---|---|---|
+| Bloodborne | `CUSA00900` | **In-game** | [View reports](https://bachatas4.games/?game=CUSA00900) | [Issue #2](https://github.com/JICA98/Bachata-S4/issues/2) |
+| Dark Souls: Remastered | `CUSA08692` | **In-game** | [View reports](https://bachatas4.games/?game=CUSA08692) | [Issue #3](https://github.com/JICA98/Bachata-S4/issues/3) |
+| Sonic Mania | `CUSA07023` | **In-game** | [View reports](https://bachatas4.games/?game=CUSA07023) | [Issue #4](https://github.com/JICA98/Bachata-S4/issues/4) |
+| Sekiro: Shadows Die Twice | `CUSA13801` | **In-game** | [View reports](https://bachatas4.games/?game=CUSA13801) | [Issue #5](https://github.com/JICA98/Bachata-S4/issues/5) |
 <!-- compatibility-running-games-end -->
 
 ### Other current tests
 
 <!-- compatibility-other-games-start -->
 | Game | Serial | Current state | Live report / discussion |
-|---|---|---:|---|
-| Crash Bandicoot N. Sane Trilogy | `CUSA07399` | **Menus** | [Compatibility](https://jica98.github.io/Bachata-S4/?game=CUSA07399) · [Issue #6](https://github.com/JICA98/Bachata-S4/issues/6) |
-| Galak-Z | `CUSA03146` | **Testing in progress** | [Issue #7](https://github.com/JICA98/Bachata-S4/issues/7) |
+|---|---:|---|---|
+| Crash Bandicoot N. Sane Trilogy | `CUSA07399` | **Menus** | [Compatibility](https://bachatas4.games/?game=CUSA07399) · [Issue #6](https://github.com/JICA98/Bachata-S4/issues/6) |
+| Galak-Z | `CUSA03146` | **Boots** | [Compatibility](https://bachatas4.games/?game=CUSA03146) · [Issue #7](https://github.com/JICA98/Bachata-S4/issues/7) |
 <!-- compatibility-other-games-end -->
 
 > [!NOTE]
@@ -121,7 +121,7 @@ Structured report data, screenshots, and compressed logs are maintained separate
 | `playable` | 0 |
 | `ingame` | 4 |
 | `menus` | 1 |
-| `boots` | 0 |
+| `boots` | 1 |
 | `nothing` | 0 |
 <!-- compatibility-status-table-end -->
 
@@ -148,6 +148,7 @@ flowchart LR
     C --> F["Vulkan rendering"]
     F --> G["Android system Vulkan driver"]
     F --> H["Selected Mesa Turnip or custom driver"]
+    F --> K["Vortek transport over the system Vulkan driver"]
     B --> I["Touch controls / physical controller"]
     B --> J["Android display, audio and lifecycle integration"]
 ```
@@ -220,7 +221,7 @@ available under **[GitHub Releases](https://github.com/JICA98/Bachata-S4/release
 4. Import user-owned homebrew or a legally dumped title.
 5. Launch the title and allow initial shader or pipeline compilation to complete.
 6. Compare the result with the
-   [live compatibility database](https://jica98.github.io/Bachata-S4/).
+   [live compatibility database](https://bachatas4.games/).
 7. When reporting a problem, include the Bachata S4 release, phone, Android version,
    selected driver, reproduction steps, and sanitized session log.
 
