@@ -237,7 +237,11 @@ input::placeholder { color: var(--faint); }
 
 .site-footer { border-top: 1px solid var(--line); background: var(--bg-elevated); }
 .footer-inner { min-height: 130px; }
-.footer-inner > p { max-width: 610px; margin: 0; color: var(--muted); font-size: .83rem; text-align: right; }
+.footer-col { display: grid; gap: 10px; max-width: 620px; }
+.footer-col > p { margin: 0; color: var(--muted); font-size: .83rem; text-align: right; }
+.footer-nav { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-end; }
+.footer-nav a { color: var(--muted); font-size: .83rem; font-weight: 700; text-decoration: none; }
+.footer-nav a:hover { color: var(--text); }
 
 .game-dialog { width: min(1050px, calc(100% - 28px)); max-height: min(90vh, 900px); padding: 0; border: 1px solid var(--line-strong); border-radius: 24px; background: var(--panel-solid); color: var(--text); box-shadow: 0 35px 120px rgba(0,0,0,.55); overflow: hidden; }
 .game-dialog::backdrop { background: rgba(2,4,10,.8); backdrop-filter: blur(9px); }
@@ -307,7 +311,7 @@ input::placeholder { color: var(--faint); }
   .game-card-body { padding: 16px; }
   .game-card-actions { padding: 0 16px 16px; }
   .footer-inner { align-items: start; flex-direction: column; padding: 26px 0; }
-  .footer-inner > p { text-align: left; }
+  .footer-col > p { text-align: left; }
   .dialog-hero { min-height: 310px; }
   .dialog-heading { padding: 50px 20px 23px; }
   .dialog-body { padding: 22px 20px 30px; }
@@ -349,3 +353,33 @@ input::placeholder { color: var(--faint); }
 .dialog-loading { min-height: 280px; display: grid; place-content: center; gap: 8px; padding: 48px; text-align: center; color: var(--muted); }
 .dialog-loading strong { color: var(--text); font-size: 1.1rem; }
 .load-more-wrap { display: flex; justify-content: center; padding-top: 26px; }
+
+/* About/how-to-read section on the homepage */
+.about-section { padding: 66px 0 10px; }
+.about-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.about-grid article { padding: 22px 23px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); }
+.about-grid h3 { margin: 0 0 8px; font-size: 1.05rem; letter-spacing: -.02em; }
+.about-grid p { margin: 0; color: var(--muted); font-size: .9rem; }
+
+/* Static info pages */
+.page-head { padding: 88px 0 36px; }
+.page-head h1 { margin: 15px 0 0; font-size: clamp(2.2rem, 6vw, 3.8rem); line-height: 1; letter-spacing: -.05em; }
+.page-body { padding: 0 0 96px; }
+.prose { max-width: 780px; }
+.prose h2 { margin: 38px 0 12px; font-size: 1.45rem; letter-spacing: -.02em; }
+.prose h3 { margin: 30px 0 10px; font-size: 1.12rem; }
+.prose p { margin: 0 0 16px; color: var(--muted); }
+.prose a { color: var(--accent); text-decoration: none; font-weight: 700; }
+.prose a:hover { text-decoration: underline; }
+.prose ul { margin: 0 0 18px; padding-left: 22px; color: var(--muted); }
+.prose li { margin-bottom: 8px; }
+.prose li strong, .prose p strong { color: var(--text); }
+.prose .button { color: var(--text); text-decoration: none; }
+.prose .button:hover { text-decoration: none; }
+
+@media (max-width: 720px) {
+  .about-grid { grid-template-columns: 1fr; }
+  .page-head { padding: 60px 0 28px; }
+  .footer-col { text-align: left; }
+  .footer-col > p, .footer-nav { text-align: left; justify-content: flex-start; }
+}

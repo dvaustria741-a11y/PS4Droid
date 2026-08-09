@@ -88,6 +88,19 @@ jobs:
             exit 1
           fi
 
+      - name: Verify production ads.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f _site/ads.txt
+          EXPECTED_ADS_TXT='google.com, pub-8704776489115590, DIRECT, f08c47fec0942fa0'
+          ACTUAL_ADS_TXT="$(tr -d '\r' < _site/ads.txt | sed '/^[[:space:]]*$/d')"
+          if [[ "$ACTUAL_ADS_TXT" != "$EXPECTED_ADS_TXT" ]]; then
+            echo "::error::Production ads.txt does not contain the expected AdSense publisher record."
+            exit 1
+          fi
+          echo "ads.txt verified: $ACTUAL_ADS_TXT"
+
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
