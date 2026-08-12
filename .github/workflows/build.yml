@@ -20,6 +20,15 @@ concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'push' }}
 
+env:
+  # Published, hash-locked runtime bundle (shadPS4 host build, Box64, FEXCore
+  # smoke runners, etc). Building this whole stack from source in CI takes
+  # hours and needs a Debian container (see android/README.md's "playstore
+  # build packages existing runtime assets; it does not generate them").
+  # We fetch the same prebuilt bundle install-host-jnilibs.mjs downloads by
+  # default so the APK build stays fast and reliable.
+  RUNTIME_RELEASE_URL: https://github.com/JICA98/Bachata-S4-Runtimes/releases/download/v0.1.0
+
 jobs:
   android-apk:
     name: Build Android APK
@@ -40,23 +49,18 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android NDK and CMake
+      - name: Install Android platform, NDK and CMake
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install "platforms;android-37.0" "ndk;29.0.14206865" "cmake;3.22.1"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          # NDK/CMake versions must match android/BachataS4/core/runtime/build.gradle.kts
+          sdkmanager --install "platforms;android-37.0" "ndk;30.0.14904198" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/30.0.14904198" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/30.0.14904198" >> "$GITHUB_ENV"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build clang lld unzip zip \
-            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: Cache Gradle
         uses: actions/cache@v5
@@ -68,17 +72,18 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Build shadPS4 core (x86_64)
-        run: runtime/scripts/build-shadps4-x86_64.sh
+      - name: Download prebuilt runtime bundle
+        run: |
+          mkdir -p android/BachataS4/app/src/main/assets/runtime
+          curl -fL -o android/BachataS4/app/src/main/assets/runtime/runtime.zip \
+            "$RUNTIME_RELEASE_URL/runtime.zip"
+          curl -fL -o android/BachataS4/app/src/main/assets/runtime/manifest.json \
+            "$RUNTIME_RELEASE_URL/manifest.json"
 
-      - name: Build Box64 host
-        run: runtime/scripts/build-box64-host.sh
-
-      - name: Package runtime
-        run: node runtime/scripts/package-runtime.mjs
-
-      - name: Verify runtime bundle
-        run: node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
+      - name: Install host jniLibs from runtime bundle
+        run: |
+          node runtime/scripts/install-host-jnilibs.mjs \
+            android/BachataS4/app/src/main/assets/runtime/runtime.zip
 
       - name: Build APK (Gradle)
         working-directory: android/BachataS4
