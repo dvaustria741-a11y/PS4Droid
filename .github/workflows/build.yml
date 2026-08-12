@@ -43,7 +43,7 @@ jobs:
       - name: Install Android NDK and CMake
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install "platforms;android-37" "ndk;29.0.14206865" "cmake;3.22.1"
+          sdkmanager --install "platforms;android-37.0" "ndk;29.0.14206865" "cmake;3.22.1"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
 
