@@ -89,7 +89,17 @@ jobs:
         working-directory: android/BachataS4
         run: |
           chmod +x gradlew
-          ./gradlew --console=plain test lintDebug assemblePlaystoreDebug
+          # verifyNativeRuntimeFixes* runs via ProcessBuilder.inheritIO(), whose
+          # output Gradle's console isn't surfacing in CI. Exclude it here and
+          # run the same script directly in the next step instead, so we get
+          # its real stdout/stderr instead of a bare "exit 1".
+          ./gradlew --console=plain test lintDebug assemblePlaystoreDebug \
+            -x verifyNativeRuntimeFixesPlaystoreDebug
+
+      - name: Verify native runtime fixes
+        run: |
+          node runtime/tests/verify-native-fixes.mjs \
+            android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-debug.apk
 
       - name: Verify APK contents
         run: |
