@@ -89,7 +89,7 @@ jobs:
         working-directory: android/BachataS4
         run: |
           chmod +x gradlew
-          ./gradlew test lintDebug assemblePlaystoreDebug
+          ./gradlew --console=plain test lintDebug assemblePlaystoreDebug
 
       - name: Verify APK contents
         run: |
