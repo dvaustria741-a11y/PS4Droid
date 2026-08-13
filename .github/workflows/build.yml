@@ -80,6 +80,66 @@ jobs:
           curl -fL -o android/BachataS4/app/src/main/assets/runtime/manifest.json \
             "$RUNTIME_RELEASE_URL/manifest.json"
 
+      - name: Install Vortek build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu libvulkan-dev zip
+          # libvulkan-dev doesn't always ship vk_icd.h (it's a loader-internal
+          # header, not part of the base Vulkan-Headers set apt pulls in).
+          if [[ ! -f /usr/include/vulkan/vk_icd.h ]]; then
+            sudo curl -fL -o /usr/include/vulkan/vk_icd.h \
+              https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/main/loader/generated/vk_icd.h \
+              || sudo curl -fL -o /usr/include/vulkan/vk_icd.h \
+              https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_icd.h
+          fi
+
+      - name: Build Vortek Vulkan client
+        # The v0.1.0 published runtime bundle predates Vortek client support
+        # (confirmed absent from its manifest.json), so runtime.zip is missing
+        # host/lib/libvulkan_vortek.so. Build it from the pinned source per
+        # runtime/scripts/build-vortek-client.sh and inject it below rather
+        # than skip the check verify-native-fixes.mjs enforces on it.
+        run: |
+          winlator_revision=$(node -e '
+            const lock = require("./runtime/locks/components.lock.json");
+            process.stdout.write(lock.components.find((c) => c.name === "winlator-app").revision);
+          ')
+          runtime/scripts/checkout-component.sh winlator-app \
+            https://github.com/JICA98/winlator-app.git "$winlator_revision"
+          runtime/scripts/vendor-vortek.sh
+          runtime/scripts/build-vortek-client.sh
+
+      - name: Inject Vortek client into runtime bundle
+        run: |
+          stage="runtime/build/vortek-client-stage"
+          zip_path="$(pwd)/android/BachataS4/app/src/main/assets/runtime/runtime.zip"
+          manifest_path="android/BachataS4/app/src/main/assets/runtime/manifest.json"
+          files=(
+            host/lib/libvulkan_vortek.so
+            host/vulkan/icd.d/vortek.json
+            usr/share/bachata/vortek/SOURCE.txt
+            usr/share/bachata/vortek/LICENSE
+          )
+
+          ( cd "$stage" && zip -r "$zip_path" "${files[@]}" )
+
+          node -e '
+            const fs = require("fs");
+            const crypto = require("crypto");
+            const [manifestPath, stageDir, fileList] = process.argv.slice(1);
+            const files = fileList.split(",");
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            for (const rel of files) {
+              const data = fs.readFileSync(`${stageDir}/${rel}`);
+              const entry = { path: rel, size: data.length, sha256: crypto.createHash("sha256").update(data).digest("hex") };
+              const idx = manifest.files.findIndex((f) => f.path === rel);
+              if (idx >= 0) manifest.files[idx] = entry; else manifest.files.push(entry);
+            }
+            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+            console.log(`manifest.json updated with ${files.length} Vortek entries`);
+          ' "$manifest_path" "$stage" "$(IFS=,; echo "${files[*]}")"
+
       - name: Install host jniLibs from runtime bundle
         run: |
           node runtime/scripts/install-host-jnilibs.mjs \
