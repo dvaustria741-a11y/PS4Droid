@@ -22,9 +22,19 @@ function listing(archive) {
     .split("\n").filter(Boolean);
 }
 
-function forbidden(entries) {
+function forbidden(entries, { allowPlaystoreDriverAssets = false } = {}) {
   return entries.filter((entry) => {
     const path = entry.toLowerCase();
+    // The `playstore` flavor intentionally bundles Turnip driver ZIPs under
+    // assets/drivers/ (+ license notices under assets/licenses/), since Play
+    // policy forbids downloading executable native code post-install - see
+    // documents/play-bundled-turnip.md. That's a separate, documented,
+    // Play-required feature from the managed runtime bundle (runtime.zip)
+    // this check is really guarding, so it's exempted here specifically.
+    if (allowPlaystoreDriverAssets &&
+        (path.startsWith("assets/drivers/") || path.startsWith("assets/licenses/"))) {
+      return false;
+    }
     const name = path.split("/").at(-1);
     return path.includes("turnip") || name === "vulkan.ad07xx.so" ||
       name === "libvulkan_freedreno.so" || /(^|\/)freedreno[^/]*\.json$/.test(path);
@@ -77,7 +87,8 @@ try {
   }
   const nativeFexEntries = apkEntries.filter((entry) => entry.startsWith("lib/") && entry.toLowerCase().includes("fex"));
   if (nativeFexEntries.length) throw new Error(`APK packages FEXCore through jniLibs: ${nativeFexEntries.join(", ")}`);
-  const offenders = [...forbidden(apkEntries), ...forbidden(runtimeEntries).map((entry) => `runtime.zip:${entry}`)];
+  const offenders = [...forbidden(apkEntries, { allowPlaystoreDriverAssets: true }),
+    ...forbidden(runtimeEntries).map((entry) => `runtime.zip:${entry}`)];
   if (offenders.length) throw new Error(`APK bundles forbidden Turnip payloads:\n${offenders.join("\n")}`);
   console.log(`APK runtime verified: ${apkEntries.length} APK entries, FEXCore smoke runner verified, no bundled Turnip`);
 } finally {
