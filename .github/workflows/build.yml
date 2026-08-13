@@ -154,6 +154,51 @@ jobs:
             console.log(`manifest.json updated with ${files.length} Vortek entries`);
           ' "$manifest_path" "$stage" "$(IFS=,; echo "${files[*]}")"
 
+      - name: Install shadPS4 ARM64 (FEX) build dependencies
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang llvm \
+            libx11-dev:arm64 libxext-dev:arm64 libuuid1:arm64 libudev1:arm64
+
+      - name: Build shadPS4 ARM64 (FEX) and FEXCore smoke runners
+        # verify-apk-runtime.mjs also requires host/fexcore-smoke,
+        # host/fexcore-guest-harness and host/shadps4-arm64-fex inside the
+        # nested runtime.zip. None of these exist in the v0.1.0 release
+        # either - it predates FEX/ARM64 support - so build them from
+        # source. build-shadps4-arm64.sh builds fexcore-smoke and
+        # fexcore-guest-harness internally as part of its own build.
+        run: runtime/scripts/build-shadps4-arm64.sh
+
+      - name: Inject shadPS4 ARM64 + FEXCore runners into runtime bundle
+        run: |
+          zip_path="$(pwd)/android/BachataS4/app/src/main/assets/runtime/runtime.zip"
+          manifest_path="android/BachataS4/app/src/main/assets/runtime/manifest.json"
+          stage=$(mktemp -d)
+          mkdir -p "$stage/host"
+          cp runtime/build/fexcore-smoke-stage/bin/fexcore-smoke "$stage/host/fexcore-smoke"
+          cp runtime/build/fexcore-smoke-stage/bin/fexcore-guest-harness "$stage/host/fexcore-guest-harness"
+          cp runtime/build/shadps4-arm64-stage/bin/shadps4-arm64 "$stage/host/shadps4-arm64-fex"
+          files=(host/fexcore-smoke host/fexcore-guest-harness host/shadps4-arm64-fex)
+
+          ( cd "$stage" && zip -r "$zip_path" "${files[@]}" )
+
+          node -e '
+            const fs = require("fs");
+            const crypto = require("crypto");
+            const [manifestPath, stageDir, fileList] = process.argv.slice(1);
+            const files = fileList.split(",");
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            for (const rel of files) {
+              const data = fs.readFileSync(`${stageDir}/${rel}`);
+              const entry = { path: rel, size: data.length, sha256: crypto.createHash("sha256").update(data).digest("hex") };
+              const idx = manifest.files.findIndex((f) => f.path === rel);
+              if (idx >= 0) manifest.files[idx] = entry; else manifest.files.push(entry);
+            }
+            fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+            console.log(`manifest.json updated with ${files.length} FEX entries`);
+          ' "$manifest_path" "$stage" "$(IFS=,; echo "${files[*]}")"
+
       - name: Install host jniLibs from runtime bundle
         run: |
           node runtime/scripts/install-host-jnilibs.mjs \
