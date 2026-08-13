@@ -188,6 +188,15 @@ jobs:
         run: runtime/scripts/build-shadps4-arm64.sh
 
       - name: Inject shadPS4 ARM64 + FEXCore runners into runtime bundle
+        # The v0.1.0 base bundle predates FEX/ARM64 support, so it carries
+        # only whatever ARM64 host glibc libs an earlier host tool needed.
+        # shadps4-arm64-fex / fexcore-smoke / fexcore-guest-harness pull in
+        # additional runtime deps (libuuid.so.1, libudev.so.1, ...) that were
+        # never part of that closure. Bundling only the three binaries here
+        # and not their shared-library deps is exactly what produced the
+        # on-device crash: "error while loading shared libraries: libuuid.so.1:
+        # cannot open shared object file". Resolve the full ELF closure of the
+        # new binaries and inject whatever isn't already in the manifest.
         run: |
           zip_path="$(pwd)/android/BachataS4/app/src/main/assets/runtime/runtime.zip"
           manifest_path="android/BachataS4/app/src/main/assets/runtime/manifest.json"
@@ -197,6 +206,60 @@ jobs:
           cp runtime/build/fexcore-smoke-stage/bin/fexcore-guest-harness "$stage/host/fexcore-guest-harness"
           cp runtime/build/shadps4-arm64-stage/bin/shadps4-arm64 "$stage/host/shadps4-arm64-fex"
           files=(host/fexcore-smoke host/fexcore-guest-harness host/shadps4-arm64-fex)
+
+          # Resolve the ARM64 shared-library closure of the newly built
+          # binaries and stage any dependency not already present in the
+          # current manifest (i.e. not already shipped by the base bundle).
+          mapfile -t new_libs < <(node -e '
+            const { execFileSync } = require("child_process");
+            const fs = require("fs");
+            const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const already = new Set(manifest.files.map((f) => f.path.replace(/^host\//, "")));
+            const arm64Paths = ["/usr/lib/aarch64-linux-gnu", "/lib/aarch64-linux-gnu"];
+            function findLib(soname) {
+              for (const p of arm64Paths) {
+                const full = `${p}/${soname}`;
+                if (fs.existsSync(full)) return fs.realpathSync(full);
+              }
+              return null;
+            }
+            function needed(file) {
+              try {
+                return execFileSync("readelf", ["-d", file], { encoding: "utf8" })
+                  .split("\n")
+                  .map((l) => l.match(/Shared library: \[([^\]]+)\]/)?.[1])
+                  .filter(Boolean);
+              } catch { return []; }
+            }
+            const roots = process.argv.slice(2);
+            const resolved = new Map();
+            const queue = [...roots];
+            const seen = new Set();
+            while (queue.length) {
+              const f = queue.shift();
+              if (seen.has(f)) continue;
+              seen.add(f);
+              for (const soname of needed(f)) {
+                if (resolved.has(soname) || already.has(soname)) continue;
+                const lib = findLib(soname);
+                if (!lib) { console.error(`WARN: unresolved ${soname} for ${f}`); continue; }
+                resolved.set(soname, lib);
+                queue.push(lib);
+              }
+            }
+            for (const [soname, path] of resolved) console.log(`${soname}\t${path}`);
+          ' "$manifest_path" \
+            "$stage/host/shadps4-arm64-fex" \
+            "$stage/host/fexcore-smoke" \
+            "$stage/host/fexcore-guest-harness")
+
+          for entry in "${new_libs[@]}"; do
+            soname="${entry%%$'\t'*}"
+            src="${entry#*$'\t'}"
+            cp "$src" "$stage/host/$soname"
+            files+=("host/$soname")
+            echo "Bundling newly required ARM64 dep: $soname"
+          done
 
           ( cd "$stage" && zip -r "$zip_path" "${files[@]}" )
 
