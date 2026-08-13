@@ -84,9 +84,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu libvulkan-dev libx11-dev zip
-          # libvulkan-dev doesn't always ship vk_icd.h (it's a loader-internal
-          # header, not part of the base Vulkan-Headers set apt pulls in).
+            binutils-aarch64-linux-gnu libx11-dev zip
+
+          # Ubuntu 24.04's packaged Vulkan headers predate extensions this
+          # Vortek client source uses (e.g. VK_EXT_map_memory_placed), which
+          # fails compilation with "unknown type name
+          # VkPhysicalDeviceMapMemoryPlacedFeaturesEXT". Vortek doesn't link
+          # against libvulkan.so (it *is* an ICD, not a loader consumer), so
+          # fetch current upstream headers instead of the distro package.
+          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git \
+            /tmp/vulkan-headers
+          sudo mkdir -p /usr/include/vulkan
+          sudo cp -r /tmp/vulkan-headers/include/vulkan/. /usr/include/vulkan/
+
           if [[ ! -f /usr/include/vulkan/vk_icd.h ]]; then
             sudo curl -fL -o /usr/include/vulkan/vk_icd.h \
               https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/main/loader/generated/vk_icd.h \
