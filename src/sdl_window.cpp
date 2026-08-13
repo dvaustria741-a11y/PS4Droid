@@ -95,9 +95,36 @@ static Uint32 SDLCALL PollControllerLightColour(void* userdata, SDL_TimerID time
     return interval;
 }
 
+static void SDLCALL ForwardSdlLogToShadPs4(void* userdata, int category, SDL_LogPriority priority,
+                                           const char* message) {
+    // SDL's own debug-level diagnostics (e.g. exactly why the X11 video
+    // driver backend failed to initialize: symbol resolution vs. display
+    // connect) are otherwise invisible in shadps4.log / diagnostic reports,
+    // since SDL_LogDebug never routes through our own logger. Bridge it so
+    // the next crash report actually shows the specific reason.
+    switch (priority) {
+    case SDL_LOG_PRIORITY_TRACE:
+    case SDL_LOG_PRIORITY_VERBOSE:
+    case SDL_LOG_PRIORITY_DEBUG:
+        LOG_DEBUG(Input, "[SDL] {}", message);
+        break;
+    case SDL_LOG_PRIORITY_INFO:
+        LOG_INFO(Input, "[SDL] {}", message);
+        break;
+    case SDL_LOG_PRIORITY_WARN:
+        LOG_WARNING(Input, "[SDL] {}", message);
+        break;
+    default:
+        LOG_ERROR(Input, "[SDL] {}", message);
+        break;
+    }
+}
+
 WindowSDL::WindowSDL(s32 width_, s32 height_, Input::GameControllers* controllers_,
                      std::string_view window_title)
     : width{width_}, height{height_}, controllers{*controllers_} {
+    SDL_SetLogPriorities(SDL_LOG_PRIORITY_DEBUG);
+    SDL_SetLogOutputFunction(ForwardSdlLogToShadPs4, nullptr);
     if (!SDL_SetHint(SDL_HINT_APP_NAME, "shadPS4")) {
         UNREACHABLE_MSG("Failed to set SDL window hint: {}", SDL_GetError());
     }
