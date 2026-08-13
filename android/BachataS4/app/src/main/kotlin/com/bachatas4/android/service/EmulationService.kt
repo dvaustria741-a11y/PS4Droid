@@ -278,7 +278,7 @@ class EmulationService : Service() {
             } else {
                 emptyMap()
             }
-            val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display) +
+            val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display, nativeLibraryDir) +
                 driverConfiguration.environment + backendEnvironment +
                 stagingDiagEnvironment(maliGpuOptimizations = launchProfile.maliGpuOptimizations)
             if (launchProfile.maliGpuOptimizations) {
@@ -665,8 +665,29 @@ class EmulationService : Service() {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun runtimeEnvironment(runtimeRoot: Path, runtimeHome: Path, socketRoot: File, display: String) = mapOf(
+    private fun runtimeEnvironment(
+        runtimeRoot: Path,
+        runtimeHome: Path,
+        socketRoot: File,
+        display: String,
+        nativeLibraryDir: Path,
+    ) = mapOf(
         "HOME" to runtimeHome.toString(),
+        // Standard dynamic-linker search path. Without this, any runtime
+        // dlopen() the guest performs (e.g. SDL3's SDL_LoadObject for the
+        // dynamically-loaded X11 backend) can only see Android's own system
+        // library paths and silently fails to find our bundled, cross-compiled
+        // libX11.so.6 / libxcb.so.1 / etc — producing "x11 not available" with
+        // no further diagnostic, since SDL_X11_LoadSymbols() doesn't log on
+        // failure. "host" is where the ELF-closure injector (CI) stages the
+        // shared-library dependencies of shadps4-arm64-fex/fexcore alongside
+        // the binaries themselves. This mirrors what the debug probe harness
+        // (Gate3Activity/Gate4Activity) already sets correctly; production
+        // launches never did.
+        "LD_LIBRARY_PATH" to listOf(
+            nativeLibraryDir.toString(),
+            runtimeRoot.resolve("host").toString(),
+        ).joinToString(":"),
         "BOX64_PATH" to runtimeRoot.resolve("bin").toString(),
         "BOX64_LOG" to "1",
         "BOX64_LOAD_ADDR" to "0x6000000000",
