@@ -96,6 +96,10 @@ jobs:
             /tmp/vulkan-headers
           sudo mkdir -p /usr/include/vulkan
           sudo cp -r /tmp/vulkan-headers/include/vulkan/. /usr/include/vulkan/
+          # vulkan_core.h includes vk_video/*.h, a sibling directory, not
+          # part of include/vulkan/ itself.
+          sudo mkdir -p /usr/include/vk_video
+          sudo cp -r /tmp/vulkan-headers/include/vk_video/. /usr/include/vk_video/
 
           if [[ ! -f /usr/include/vulkan/vk_icd.h ]]; then
             sudo curl -fL -o /usr/include/vulkan/vk_icd.h \
