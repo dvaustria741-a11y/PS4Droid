@@ -311,14 +311,34 @@ jobs:
             const [manifestPath, removedList] = process.argv.slice(1);
             const removed = new Set(removedList.split(",").filter(Boolean));
             if (removed.size === 0) {
-              console.log("No host/libXext.so.6* entries found to remove");
-              process.exit(0);
+              console.error("FATAL: expected host/libXext.so.6* entries in runtime.zip but found none to remove.");
+              console.error("Either the bundle layout changed, or this step is silently no-op-ing again.");
+              process.exit(1);
             }
             const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
             manifest.files = manifest.files.filter((f) => !removed.has(f.path));
             fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
             console.log(`manifest.json: removed ${removed.size} broken libXext entries`);
           ' "$manifest_path" "$(IFS=,; echo "${removed[*]}")"
+
+      - name: Verify libXext.so.6 is actually gone from the packaged runtime.zip
+        # Belt-and-suspenders check for the previous step: confirm the exact
+        # file the previous "Remove broken vendored libXext.so.6" step
+        # should have deleted is genuinely absent from the runtime.zip that
+        # Gradle is about to embed as an APK asset, not just that the step
+        # reported success. A prior on-device diagnostic showed the file
+        # still present and still crashing despite that step reporting
+        # success, with no visible cause found by re-running its exact
+        # zip logic in isolation -- so verify the actual artifact here
+        # instead of trusting the step's own exit code.
+        run: |
+          zip_path="android/BachataS4/app/src/main/assets/runtime/runtime.zip"
+          if unzip -Z1 "$zip_path" | grep -qE '^host/libXext\.so(\.[0-9]+)*$'; then
+            echo "FATAL: host/libXext.so.6 is still present in $zip_path:"
+            unzip -Z1 "$zip_path" | grep -E '^host/libXext\.so(\.[0-9]+)*$'
+            exit 1
+          fi
+          echo "Confirmed: no host/libXext.so.6* entries in $zip_path"
 
       - name: Install host jniLibs from runtime bundle
         run: |
@@ -335,6 +355,24 @@ jobs:
           # its real stdout/stderr instead of a bare "exit 1".
           ./gradlew --console=plain test lintDebug assemblePlaystoreDebug \
             -x verifyNativeRuntimeFixesPlaystoreDebug
+
+      - name: Verify libXext.so.6 is absent from the assembled APK
+        # The strongest possible check: unzip runtime.zip out of the actual
+        # APK Gradle just produced (not the pre-Gradle assets/ copy checked
+        # earlier), and confirm it too is free of host/libXext.so.6. This
+        # catches any gap between "the asset file on disk was modified" and
+        # "what Gradle actually packaged" -- e.g. stale Gradle task/build
+        # caching -- which the earlier pre-Gradle check can't see.
+        run: |
+          apk_path="android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-debug.apk"
+          work=$(mktemp -d)
+          unzip -p "$apk_path" assets/runtime/runtime.zip > "$work/runtime.zip"
+          if unzip -Z1 "$work/runtime.zip" | grep -qE '^host/libXext\.so(\.[0-9]+)*$'; then
+            echo "FATAL: host/libXext.so.6 is present in the runtime.zip packaged inside $apk_path:"
+            unzip -Z1 "$work/runtime.zip" | grep -E '^host/libXext\.so(\.[0-9]+)*$'
+            exit 1
+          fi
+          echo "Confirmed: assembled APK's bundled runtime.zip has no host/libXext.so.6* entries"
 
       - name: Verify native runtime fixes
         run: |
