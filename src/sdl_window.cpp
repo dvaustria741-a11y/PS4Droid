@@ -120,6 +120,33 @@ static void SDLCALL ForwardSdlLogToShadPs4(void* userdata, int category, SDL_Log
     }
 }
 
+#if !defined(__APPLE__) && !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
+static void PreloadX11ExtensionSymbols() {
+#if !defined(__APPLE__) && !defined(_WIN32)
+    // The vendored libX11.so.6 in this runtime bundle has unresolved
+    // references to MIT-SHM symbols (_XShmQueryVersion, XShmPixmapFormat,
+    // ...) that are only satisfied once libXext.so.6 is already loaded into
+    // the process's global symbol table -- normally the case on a desktop
+    // Linux system where libXext ends up loaded early via some other
+    // dependency chain. SDL3's own X11 backend probe (SDL_X11_LoadSymbols)
+    // dlopens libX11.so.6 first and libXext.so.6 second, so on this bundle
+    // that ordering hits the unresolved symbols and SDL_X11_LoadSymbols
+    // fails outright -- silently, since it doesn't log on failure. Loading
+    // libXext.so.6 here first, with RTLD_GLOBAL, makes its symbols visible
+    // process-wide before SDL ever touches libX11.so.6, regardless of the
+    // order SDL's own probe uses. Best-effort: if this bundle's libXext
+    // isn't found (or on X11 setups where libX11 doesn't need it), SDL's
+    // own subsequent dlopen calls still proceed unaffected.
+    void* xext = dlopen("libXext.so.6", RTLD_NOW | RTLD_GLOBAL);
+    if (!xext) {
+        LOG_DEBUG(Input, "Preload of libXext.so.6 failed (non-fatal): {}", dlerror());
+    }
+#endif
+}
+
 WindowSDL::WindowSDL(s32 width_, s32 height_, Input::GameControllers* controllers_,
                      std::string_view window_title)
     : width{width_}, height{height_}, controllers{*controllers_} {
@@ -128,6 +155,7 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, Input::GameControllers* controller
     if (!SDL_SetHint(SDL_HINT_APP_NAME, "shadPS4")) {
         UNREACHABLE_MSG("Failed to set SDL window hint: {}", SDL_GetError());
     }
+    PreloadX11ExtensionSymbols();
     LOG_INFO(Input, "Initializing SDL video subsystem");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         UNREACHABLE_MSG("Failed to initialize SDL video subsystem: {}", SDL_GetError());
