@@ -25,8 +25,8 @@ object LogcatCapture {
 
     /** Returns buffered logcat lines for this process, or null if capture failed. */
     fun captureOwnProcess(): String? {
-        val pid = Process.myPid()
         return try {
+            val pid = Process.myPid()
             val process = ProcessBuilder(
                 "logcat", "-d", "-v", "threadtime", "--pid=$pid",
             ).redirectErrorStream(true).start()
