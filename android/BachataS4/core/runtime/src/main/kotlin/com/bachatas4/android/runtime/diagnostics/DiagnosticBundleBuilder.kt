@@ -128,6 +128,22 @@ class DiagnosticBundleBuilder(
         prepareFile("runtime.log", "session.runtime", sessionDir.resolve("runtime.log"), required = false)
         prepareFile("session.json", "session.metadata", sessionDir.resolve("session.json"), required = false)
 
+        // Native code loaded into this process (e.g. libwinlator.so's X11
+        // socket setup) logs failures via __android_log_print, which only
+        // reaches logcat - not application.log or shadps4.log. Capture it
+        // so bind()/listen() errno and similar are visible in reports
+        // instead of only being inferable from a downstream SDL failure.
+        LogcatCapture.captureOwnProcess()?.let { logcatText ->
+            prepareText("logcat.txt", "session.logcat", logcatText, required = false)
+        } ?: run {
+            attachmentMeta += DiagnosticAttachment(
+                filename = "logcat.txt",
+                present = false,
+                required = false,
+                logicalSource = "session.logcat",
+            )
+        }
+
         val processExit = context.termination
         prepareText(
             "process-exit.json",
