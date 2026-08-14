@@ -188,6 +188,7 @@ class RuntimeProcessLauncher(
             "BACHATA_VORTEK_PROC_AUDIT",
             "BACHATA_VORTEK_TRACE_BIND_VERTEX_BUFFERS",
             "BACHATA_FEX_TRACE_SIGSYS",
+            "LD_DEBUG",
             // Guest staging / Mali freeflight (see staging_diag.h).
             "BACHATA_MALI_GPU_OPT",
             "BACHATA_STAGING_VERBOSE",

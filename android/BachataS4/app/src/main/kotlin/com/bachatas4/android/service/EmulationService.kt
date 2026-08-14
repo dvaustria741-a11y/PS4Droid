@@ -673,6 +673,24 @@ class EmulationService : Service() {
         nativeLibraryDir: Path,
     ) = mapOf(
         "HOME" to runtimeHome.toString(),
+        // TEMPORARY diagnostic for the still-unresolved "x11 not available"
+        // crash: SDL3's X11 symbol loader (SDL_X11_LoadSymbols/X11_GetSym in
+        // externals/sdl3/src/video/x11/SDL_x11dyn.c) only reports *which*
+        // dlopen()/dlsym() call failed via a raw printf() gated behind a
+        // hardcoded 'DEBUG_DYNAMIC_X11 0' - it never goes through SDL's
+        // logging API at all, so the earlier SDL log bridge (c2c4df63) could
+        // never have caught this specific failure regardless of priority.
+        // Patching that printf on is also unreliable here: the process
+        // aborts via UNREACHABLE_MSG immediately after, and buffered stdio
+        // output this early/short is unlikely to have been flushed before
+        // an abort() tears the process down. glibc's own LD_DEBUG avoids
+        // both problems - it writes via raw write(), not the process's
+        // buffered stdio, so it survives an abrupt abort, and it reports
+        // every dlopen/relocation/symbol-resolution attempt regardless of
+        // what the calling code logs. Goes to stderr, which is already
+        // merged into stdout and captured into shadps4.log. Remove once the
+        // dlopen failure is root-caused.
+        "LD_DEBUG" to "libs",
         // Standard dynamic-linker search path. Without this, any runtime
         // dlopen() the guest performs (e.g. SDL3's SDL_LoadObject for the
         // dynamically-loaded X11 backend) can only see Android's own system
