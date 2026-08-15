@@ -164,6 +164,25 @@ class RuntimeInstallerTest {
         assertTrue(result.isSuccess)
     }
 
+    @Test
+    fun reinstallsWhenMarkerMatchesButOnDiskContentWasTamperedWith() {
+        val root = runtimeRoot()
+        val content = "same".encodeToByteArray()
+        val manifest = manifest(version = "1.0.0", "lib/runtime.so" to content)
+        val installed = RuntimeInstaller(root).install(zipOf("lib/runtime.so" to content), manifest).getOrThrow()
+
+        // Simulate the installed file diverging from what the (still-present,
+        // still-matching) fingerprint marker claims -- corruption, external
+        // tampering, or some other process silently reintroducing different
+        // content underneath an otherwise-untouched marker file.
+        Files.write(installed.resolve("lib/runtime.so"), "tampered".encodeToByteArray())
+
+        val result = RuntimeInstaller(root).install(zipOf("lib/runtime.so" to content), manifest)
+
+        val reinstalled = result.getOrThrow()
+        assertArrayEquals(content, Files.readAllBytes(reinstalled.resolve("lib/runtime.so")))
+    }
+
     private fun runtimeRoot(name: String = "runtime"): Path =
         temporaryFolder.newFolder(name).toPath()
 

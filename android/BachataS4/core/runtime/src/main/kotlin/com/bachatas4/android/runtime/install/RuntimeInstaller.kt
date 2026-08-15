@@ -35,18 +35,20 @@ class RuntimeInstaller(
         val fingerprint = manifest.contentFingerprint()
         if (Files.isDirectory(target)) {
             val marker = target.resolve(FINGERPRINT_FILE)
-            val existingFingerprint = runCatching {
+            val markerFingerprint = runCatching {
                 String(Files.readAllBytes(marker), Charsets.UTF_8).trim()
             }.getOrNull()
-            if (existingFingerprint == fingerprint) {
-                // Same runtimeVersion AND identical file content already installed: nothing to do.
+            if (markerFingerprint == fingerprint && verifyInstalledContent(target, manifest.files)) {
+                // Same runtimeVersion, marker claims identical content, AND the actual
+                // on-disk files verify against the manifest's declared hashes: trust it.
                 return target
             }
-            // runtimeVersion matches (same target directory name) but the bundled
-            // runtime.zip's actual contents differ -- e.g. CI added/removed a file since
-            // this device last installed/updated. The old extraction is stale and must
-            // not be silently kept, or fixes shipped in a new APK build never take
-            // effect on already-installed devices.
+            // Either the marker doesn't match (bundled runtime.zip's content changed
+            // since this device last installed/updated -- runtimeVersion alone doesn't
+            // reflect that), or it matched but the files on disk don't actually verify
+            // (corruption, external tampering, or some other process silently
+            // reintroducing stale content the marker can't see). Either way the
+            // existing extraction can't be trusted; wipe and re-extract fresh.
             deleteRecursively(target)
         }
 
@@ -64,6 +66,24 @@ class RuntimeInstaller(
         } finally {
             deleteRecursively(staging)
         }
+    }
+
+    /**
+     * Re-verifies actual on-disk file content (size + SHA-256) against what the manifest
+     * declares. Deliberately independent of the fingerprint marker file: the marker only
+     * proves *a* successful extraction happened at some point, not that the files are
+     * still what that extraction wrote (e.g. an OEM app-data restore mechanism silently
+     * reintroducing an older extraction's files, alongside a marker from a *different*
+     * install that happens to still be present).
+     */
+    private fun verifyInstalledContent(target: Path, files: List<RuntimeFile>): Boolean = files.all { file ->
+        runCatching {
+            val path = safeRelativePath(target, file.path)
+            val resolved = target.resolve(path)
+            if (!Files.isRegularFile(resolved)) return@runCatching false
+            if (Files.size(resolved) != file.size) return@runCatching false
+            Files.newInputStream(resolved).use { sha256(it) } == file.sha256
+        }.getOrDefault(false)
     }
 
     private fun declarationsByPath(
