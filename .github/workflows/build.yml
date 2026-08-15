@@ -80,6 +80,50 @@ jobs:
           curl -fL -o android/BachataS4/app/src/main/assets/runtime/manifest.json \
             "$RUNTIME_RELEASE_URL/manifest.json"
 
+      - name: Verify runtime bundle against known-good hash
+        # GitHub release assets under an existing tag are not guaranteed
+        # immutable - the maintainer can replace the file bytes without
+        # changing the tag or filename. That's exactly what happened here:
+        # an on-device crash (undefined symbol: XMissingExtension /
+        # XShmAttach / etc, "fatal") traced back to host/libX11.so.6
+        # itself having a hard, undeclared dependency on Xext symbols in
+        # whatever copy of runtime.zip an earlier CI run downloaded from
+        # this same URL - while a fresh download of the identical URL
+        # later verified completely clean (no Shm-related undefined
+        # symbols, no libXext.so.6 NEEDED entry). Pin to that verified-
+        # clean hash and fail loudly instead of silently building against
+        # whatever the URL happens to serve on a given day. If this
+        # legitimately needs to change (a real upstream update), update
+        # the expected hash here deliberately rather than removing the
+        # check.
+        run: |
+          expected_runtime_sha256="637ebe20947d508a888e75f9201f24b33bf3fc1933c2c2b99092a09a88368ab8"
+          expected_manifest_sha256="a972f93a33b2082be782e503fa8d95c783342ec0634b6892f0bb3ac42d2a8427"
+          actual_runtime_sha256=$(sha256sum android/BachataS4/app/src/main/assets/runtime/runtime.zip | cut -d' ' -f1)
+          actual_manifest_sha256=$(sha256sum android/BachataS4/app/src/main/assets/runtime/manifest.json | cut -d' ' -f1)
+
+          ok=1
+          if [[ "$actual_runtime_sha256" != "$expected_runtime_sha256" ]]; then
+            echo "FATAL: runtime.zip sha256 mismatch"
+            echo "  expected: $expected_runtime_sha256"
+            echo "  actual:   $actual_runtime_sha256"
+            ok=0
+          fi
+          if [[ "$actual_manifest_sha256" != "$expected_manifest_sha256" ]]; then
+            echo "FATAL: manifest.json sha256 mismatch"
+            echo "  expected: $expected_manifest_sha256"
+            echo "  actual:   $actual_manifest_sha256"
+            ok=0
+          fi
+          if [[ "$ok" -eq 0 ]]; then
+            echo "The v0.1.0 release asset content changed since this hash was pinned."
+            echo "If this is a legitimate upstream update, verify the new content is"
+            echo "actually correct (e.g. host/libX11.so.6 has no undefined Xext/Shm"
+            echo "symbols) before updating the expected hash in this workflow step."
+            exit 1
+          fi
+          echo "Runtime bundle hash verified."
+
       - name: Install Vortek build dependencies
         run: |
           sudo apt-get update
