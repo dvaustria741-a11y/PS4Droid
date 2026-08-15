@@ -113,9 +113,9 @@ class RuntimeInstallerTest {
         Files.createDirectories(currentFile.parent)
         Files.writeString(currentFile, "current")
         val replacement = "replacement".encodeToByteArray()
-        val installer = RuntimeInstaller(root) { _, _ ->
+        val installer = RuntimeInstaller(root, promote = { _, _ ->
             throw InterruptedIOException("simulated interruption")
-        }
+        })
 
         val result = installer.install(
             zipOf("lib/runtime.so" to replacement),
