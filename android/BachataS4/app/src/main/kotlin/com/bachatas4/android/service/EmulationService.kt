@@ -612,10 +612,9 @@ class EmulationService : Service() {
             }
             val target = installRoot.resolve(manifest.runtimeVersion)
             return assets.open("runtime/runtime.zip").use { bundle ->
-                RuntimeInstaller(installRoot, onDecision = { sessionLog.info("Runtime", it) })
-                    .install(bundle, manifest).getOrElse { error ->
-                        if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
-                    }
+                RuntimeInstaller(installRoot).install(bundle, manifest).getOrElse { error ->
+                    if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
+                }
             }
         }
         val installedDir = installRoot.toFile().listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("box64-") }
