@@ -612,10 +612,9 @@ class EmulationService : Service() {
             }
             val target = installRoot.resolve(manifest.runtimeVersion)
             return assets.open("runtime/runtime.zip").use { bundle ->
-                RuntimeInstaller(installRoot, onDecision = { sessionLog.info("Runtime", it) })
-                    .install(bundle, manifest).getOrElse { error ->
-                        if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
-                    }
+                RuntimeInstaller(installRoot).install(bundle, manifest).getOrElse { error ->
+                    if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
+                }
             }
         }
         val installedDir = installRoot.toFile().listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("box64-") }
@@ -646,6 +645,33 @@ class EmulationService : Service() {
                     "got ${sha.take(16)}… (workspace build OK for product FHD ring)",
             )
         }
+
+        // The 'x11 not available' crash traces back to host/libXext.so.6 failing to
+        // relocate against host/libX11.so.6 (undefined XShm*/XMissingExtension
+        // symbols) -- but every independently re-downloaded, hash-pinned copy of
+        // these exact files, verified via readelf/nm off-device, is clean. Log their
+        // actual on-device SHA-256 directly so the next diagnostic report settles
+        // whether the files present at crash time genuinely match what CI pins,
+        // rather than continuing to infer file content from LD_DEBUG output alone.
+        for (name in listOf("libX11.so.6", "libXext.so.6")) {
+            val fileSha = fileSha256(runtimeRoot.resolve("host/$name"))
+            sessionLog.info("Runtime", "ON_DISK_HASH host/$name sha256=$fileSha")
+        }
+    }
+
+    private fun fileSha256(path: Path): String {
+        val file = path.toFile()
+        if (!file.isFile) return "missing"
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(1024 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n <= 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun guestSha256(runtimeRoot: Path): String {
