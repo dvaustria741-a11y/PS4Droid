@@ -17,6 +17,10 @@ class RuntimeInstaller(
     private val promote: (staging: Path, target: Path) -> Unit = { staging, target ->
         Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE)
     },
+    // Observability hook so callers can log which path install() actually took, without
+    // RuntimeInstaller itself depending on any Android logging API (keeps this class pure
+    // JVM-testable). Default no-op preserves behavior for existing callers/tests.
+    private val onDecision: (String) -> Unit = {},
 ) {
     fun install(bundle: InputStream, manifest: RuntimeManifest): Result<Path> = try {
         Result.success(installOrThrow(bundle, manifest))
@@ -38,9 +42,14 @@ class RuntimeInstaller(
             val markerFingerprint = runCatching {
                 String(Files.readAllBytes(marker), Charsets.UTF_8).trim()
             }.getOrNull()
-            if (markerFingerprint == fingerprint && verifyInstalledContent(target, manifest.files)) {
+            val markerMatches = markerFingerprint == fingerprint
+            val contentVerified = markerMatches && verifyInstalledContent(target, manifest.files)
+            if (contentVerified) {
                 // Same runtimeVersion, marker claims identical content, AND the actual
                 // on-disk files verify against the manifest's declared hashes: trust it.
+                onDecision(
+                    "up-to-date: fingerprint=${fingerprint.take(12)} verified against on-disk content, skipping re-extraction"
+                )
                 return target
             }
             // Either the marker doesn't match (bundled runtime.zip's content changed
@@ -49,7 +58,15 @@ class RuntimeInstaller(
             // (corruption, external tampering, or some other process silently
             // reintroducing stale content the marker can't see). Either way the
             // existing extraction can't be trusted; wipe and re-extract fresh.
+            val reason = if (!markerMatches) {
+                "fingerprint mismatch (marker=${markerFingerprint?.take(12) ?: "none"}, expected=${fingerprint.take(12)})"
+            } else {
+                "on-disk content failed verification despite matching fingerprint marker"
+            }
+            onDecision("re-extracting stale install at $target: $reason")
             deleteRecursively(target)
+        } else {
+            onDecision("fresh install: no prior directory at $target")
         }
 
         Files.createDirectories(root)
@@ -62,6 +79,9 @@ class RuntimeInstaller(
             Files.write(staging.resolve(FINGERPRINT_FILE), fingerprint.toByteArray(Charsets.UTF_8))
             if (Files.exists(target)) throw FileAlreadyExistsException(target.toString())
             promote(staging, target)
+            onDecision(
+                "extraction complete: ${declaredFiles.size} files, fingerprint=${fingerprint.take(12)} -> $target"
+            )
             return target
         } finally {
             deleteRecursively(staging)
