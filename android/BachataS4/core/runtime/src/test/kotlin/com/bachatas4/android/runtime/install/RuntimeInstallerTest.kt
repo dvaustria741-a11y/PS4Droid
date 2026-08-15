@@ -128,6 +128,42 @@ class RuntimeInstallerTest {
         assertFalse(Files.exists(root.resolve(".staging-2.0.0")))
     }
 
+    @Test
+    fun reinstallsWhenTargetExistsButBundledContentDiffers() {
+        val root = runtimeRoot()
+        val oldContent = "old".encodeToByteArray()
+        val newContent = "new-and-longer".encodeToByteArray()
+
+        val oldManifest = manifest(version = "1.0.0", "lib/runtime.so" to oldContent)
+        RuntimeInstaller(root).install(zipOf("lib/runtime.so" to oldContent), oldManifest).getOrThrow()
+
+        // Same runtimeVersion (as it would be across our own commits that only
+        // change runtime.zip's contents, not the upstream box64 revision string)
+        // but different file content - the stale extraction must be replaced,
+        // not silently kept.
+        val newManifest = manifest(version = "1.0.0", "lib/runtime.so" to newContent)
+        val result = RuntimeInstaller(root).install(zipOf("lib/runtime.so" to newContent), newManifest)
+
+        val installed = result.getOrThrow()
+        assertArrayEquals(newContent, Files.readAllBytes(installed.resolve("lib/runtime.so")))
+    }
+
+    @Test
+    fun skipsReExtractionWhenFingerprintAlreadyMatches() {
+        val root = runtimeRoot()
+        val content = "same".encodeToByteArray()
+        val manifest = manifest(version = "1.0.0", "lib/runtime.so" to content)
+        RuntimeInstaller(root).install(zipOf("lib/runtime.so" to content), manifest).getOrThrow()
+
+        // An empty zip and a promote() that fails the test if called: if the
+        // fingerprint fast-path didn't short-circuit before touching the
+        // bundle, this call would fail on the missing declared entry.
+        val result = RuntimeInstaller(root, promote = { _, _ -> throw AssertionError("should not re-promote") })
+            .install(zipOf(), manifest)
+
+        assertTrue(result.isSuccess)
+    }
+
     private fun runtimeRoot(name: String = "runtime"): Path =
         temporaryFolder.newFolder(name).toPath()
 

@@ -69,11 +69,23 @@ class SetupViewModel @Inject constructor(
         val runtimeRoot = java.io.File(context.filesDir, "runtime")
         val isInstalled = runtimeRoot.listFiles()?.any { it.isDirectory && it.name.startsWith("box64-") } == true
         if (isInstalled) {
+            // Optimistic UI state while the fingerprint check below runs in the
+            // background - avoids a "not installed" flash for the common case
+            // where the on-disk extraction already matches what's bundled.
             mutableState.value = mutableState.value.copy(
                 runtimeInstalled = true,
                 integrityVerified = true
             )
-        } else if (!downloadRuntime) {
+        }
+        if (!downloadRuntime) {
+            // Always run this, even when isInstalled is already true: directory
+            // presence alone doesn't mean the extraction matches the currently
+            // bundled runtime.zip (see RuntimeInstaller's content-fingerprint
+            // check). Without this, a device that already has any prior
+            // extraction would never pick up a newer runtime.zip shipped in a
+            // later APK build. install() compares a fingerprint and only
+            // re-extracts when it's actually stale, so this is a fast no-op on
+            // the common up-to-date case.
             extractRuntimeFromAssets()
         }
     }

@@ -32,6 +32,24 @@ class RuntimeInstaller(
         requireContained(root, staging)
         requireContained(root, target)
 
+        val fingerprint = manifest.contentFingerprint()
+        if (Files.isDirectory(target)) {
+            val marker = target.resolve(FINGERPRINT_FILE)
+            val existingFingerprint = runCatching {
+                String(Files.readAllBytes(marker), Charsets.UTF_8).trim()
+            }.getOrNull()
+            if (existingFingerprint == fingerprint) {
+                // Same runtimeVersion AND identical file content already installed: nothing to do.
+                return target
+            }
+            // runtimeVersion matches (same target directory name) but the bundled
+            // runtime.zip's actual contents differ -- e.g. CI added/removed a file since
+            // this device last installed/updated. The old extraction is stale and must
+            // not be silently kept, or fixes shipped in a new APK build never take
+            // effect on already-installed devices.
+            deleteRecursively(target)
+        }
+
         Files.createDirectories(root)
         deleteRecursively(staging)
         Files.createDirectory(staging)
@@ -39,6 +57,7 @@ class RuntimeInstaller(
         try {
             val declaredFiles = declarationsByPath(staging, manifest.files)
             extractAndVerify(bundle, staging, declaredFiles)
+            Files.write(staging.resolve(FINGERPRINT_FILE), fingerprint.toByteArray(Charsets.UTF_8))
             if (Files.exists(target)) throw FileAlreadyExistsException(target.toString())
             promote(staging, target)
             return target
@@ -142,5 +161,6 @@ class RuntimeInstaller(
     private companion object {
         val HASH_PATTERN = Regex("[0-9a-f]{64}")
         val VERSION_PATTERN = Regex("[A-Za-z0-9._-]+")
+        const val FINGERPRINT_FILE = ".runtime-fingerprint"
     }
 }

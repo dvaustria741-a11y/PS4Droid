@@ -611,9 +611,6 @@ class EmulationService : Service() {
                 Json { ignoreUnknownKeys = true }.decodeFromString<RuntimeManifest>(it.readText())
             }
             val target = installRoot.resolve(manifest.runtimeVersion)
-            if (target.toFile().isDirectory) {
-                return target
-            }
             return assets.open("runtime/runtime.zip").use { bundle ->
                 RuntimeInstaller(installRoot).install(bundle, manifest).getOrElse { error ->
                     if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
